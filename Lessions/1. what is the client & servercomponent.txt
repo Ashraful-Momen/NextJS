@@ -1,0 +1,7 @@
+#server component : directly render from server to browser . no option like : dom , window , session , localstorage. cause those all available in the client component . 
+
+#client component : 
+-------------------
+ user click btn that intereact with the browser those component is client component  . pre-render from server to the browser .
+
+ ex: in the client component use directive 'use client' top of the file.jsx
