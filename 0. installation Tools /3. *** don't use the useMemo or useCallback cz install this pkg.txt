@@ -1,0 +1,21 @@
+┌─[✗]─[shuvo@parrot]─[~/Code/NextJS/nextjs_demo/my-app]
+└──╼ $npm install babel-plugin-react-compiler@latest
+
+added 1 package, and audited 370 packages in 2s
+
+147 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+
+# goto => next.config.js
+-------------------------
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactCompiler: true,
+  /* config options here */
+};
+
+export default nextConfig;
