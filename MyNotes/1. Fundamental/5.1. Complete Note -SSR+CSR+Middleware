@@ -1,0 +1,1001 @@
+# Next.js Complete CRUD Note (SSR + CSR + ORM + Middleware)
+
+# 1. Full Architecture Concept
+
+```txt id="k9x1az"
+                        NEXT.JS FULL STACK
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│                       FRONTEND                               │
+│                                                              │
+│    ┌────────────────────────────────────────────────────┐    │
+│    │             SERVER COMPONENT (SSR)                │    │
+│    │                                                    │    │
+│    │  - Fetch Data from DB                             │    │
+│    │  - SEO                                            │    │
+│    │  - Fast Initial Load                              │    │
+│    └────────────────────────────────────────────────────┘    │
+│                           │                                  │
+│                           ▼                                  │
+│    ┌────────────────────────────────────────────────────┐    │
+│    │             CLIENT COMPONENT (CSR)                │    │
+│    │                                                    │    │
+│    │  - Add Button                                     │    │
+│    │  - Edit Button                                    │    │
+│    │  - Delete Button                                  │    │
+│    │  - Form Submit                                    │    │
+│    │  - useState                                       │    │
+│    └────────────────────────────────────────────────────┘    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+                    ┌────────────────┐
+                    │  API ROUTES    │
+                    │ /api/users     │
+                    └────────────────┘
+                            │
+                            ▼
+                    ┌────────────────┐
+                    │      ORM       │
+                    │    Prisma      │
+                    └────────────────┘
+                            │
+                            ▼
+                    ┌────────────────┐
+                    │    DATABASE    │
+                    │ MySQL/Postgres │
+                    └────────────────┘
+```
+
+---
+
+# 2. What is ORM ?
+
+ORM = Object Relational Mapping
+
+ORM converts:
+
+```txt id="7tq0s5"
+JavaScript Object
+        ⇅
+Database Table
+```
+
+---
+
+# 3. Why ORM ?
+
+| Without ORM    | With ORM     |
+| -------------- | ------------ |
+| Raw SQL        | Easy Query   |
+| Complex        | Simple       |
+| Manual Mapping | Automatic    |
+| More Error     | Cleaner Code |
+
+---
+
+# 4. Why Prisma ORM ?
+
+Prisma ORM is the most popular ORM for Next.js.
+
+Benefits:
+
+* Type Safe
+* Fast
+* Modern
+* Easy Migration
+* Easy CRUD
+* Perfect for Next.js
+
+---
+
+# 5. Full Project Structure
+
+```txt id="u1t8pa"
+next-crud-app/
+│
+├── app/
+│   ├── api/
+│   │   └── users/
+│   │       ├── route.js
+│   │       └── [id]/
+│   │           └── route.js
+│   │
+│   ├── dashboard/
+│   │   └── page.jsx
+│   │
+│   ├── login/
+│   │   └── page.jsx
+│   │
+│   ├── page.jsx
+│   │
+│   └── layout.jsx
+│
+├── components/
+│   ├── AddButton.jsx
+│   ├── EditButton.jsx
+│   ├── DeleteButton.jsx
+│   └── UserTable.jsx
+│
+├── prisma/
+│   └── schema.prisma
+│
+├── lib/
+│   └── prisma.js
+│
+├── middleware.js
+├── package.json
+└── .env
+```
+
+---
+
+# 6. Install Prisma ORM
+
+## Install Package
+
+```bash id="1cd0ql"
+npm install prisma @prisma/client
+```
+
+---
+
+## Initialize Prisma
+
+```bash id="ejn4g0"
+npx prisma init
+```
+
+---
+
+# 7. Prisma Folder Structure
+
+```txt id="lnk7ji"
+prisma/
+    schema.prisma
+```
+
+---
+
+# 8. Database Connection
+
+## .env
+
+```env id="9jlwmw"
+DATABASE_URL="mysql://root:password@localhost:3306/nextcrud"
+```
+
+---
+
+# 9. Prisma Schema
+
+## prisma/schema.prisma
+
+```prisma id="d2j5qa"
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+
+    id        Int      @id @default(autoincrement())
+
+    name      String
+
+    email     String   @unique
+
+    createdAt DateTime @default(now())
+}
+```
+
+---
+
+# 10. Run Migration
+
+## Create Table
+
+```bash id="d3v14x"
+npx prisma migrate dev --name init
+```
+
+---
+
+# 11. Generate Prisma Client
+
+```bash id="s5u12v"
+npx prisma generate
+```
+
+---
+
+# 12. Database Table Result
+
+```txt id="q3jqkg"
+User Table
+┌────┬────────┬───────────────────┬──────────────────┐
+│ id │ name   │ email             │ createdAt        │
+├────┼────────┼───────────────────┼──────────────────┤
+│ 1  │ Rahim  │ rahim@gmail.com   │ 2026-01-01       │
+│ 2  │ Karim  │ karim@gmail.com   │ 2026-01-01       │
+└────┴────────┴───────────────────┴──────────────────┘
+```
+
+---
+
+# 13. Prisma Client Setup
+
+## lib/prisma.js
+
+```js id="rzr9rv"
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = global;
+
+export const prisma =
+    globalForPrisma.prisma ||
+    new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = prisma;
+}
+```
+
+---
+
+# 14. SSR (Server Side Rendering)
+
+```txt id="e8g7m3"
+Browser Request
+        │
+        ▼
+Next.js Server
+        │
+        ▼
+Fetch Data From DB
+        │
+        ▼
+Render HTML
+        │
+        ▼
+Send Ready HTML to Browser
+```
+
+---
+
+# 15. SSR PAGE
+
+## app/page.jsx
+
+```jsx id="0w4r1u"
+import { prisma } from "@/lib/prisma";
+
+import UserTable from "@/components/UserTable";
+
+export default async function HomePage() {
+
+    // SSR DATABASE QUERY
+    const users = await prisma.user.findMany({
+        orderBy: {
+            id: "desc",
+        },
+    });
+
+    return (
+        <div>
+
+            <h1>User List (SSR)</h1>
+
+            <UserTable users={users} />
+
+        </div>
+    );
+}
+```
+
+---
+
+# 16. CSR (Client Side Rendering)
+
+CSR is used for:
+
+* Button Click
+* Form Submit
+* Live Update
+* Interactive UI
+
+---
+
+# 17. IMPORTANT RULE
+
+If component uses:
+
+* useState
+* useEffect
+* onClick
+
+Then MUST use:
+
+```js id="hmnh2n"
+"use client";
+```
+
+---
+
+# 18. ADD BUTTON (CSR)
+
+## components/AddButton.jsx
+
+```jsx id="ymkklm"
+"use client";
+
+import { useState } from "react";
+
+export default function AddButton() {
+
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+
+    async function addUser() {
+
+        await fetch("/api/users", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+                name,
+                email,
+            }),
+        });
+
+        alert("User Added");
+    }
+
+    return (
+        <div>
+
+            <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+            />
+
+            <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <button onClick={addUser}>
+                Add User
+            </button>
+
+        </div>
+    );
+}
+```
+
+---
+
+# 19. EDIT BUTTON (CSR)
+
+## components/EditButton.jsx
+
+```jsx id="p6mcf8"
+"use client";
+
+export default function EditButton({ id }) {
+
+    async function updateUser() {
+
+        await fetch(`/api/users/${id}`, {
+            method: "PUT",
+
+            headers: {
+                "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+                name: "Updated User",
+            }),
+        });
+
+        alert("User Updated");
+    }
+
+    return (
+        <button onClick={updateUser}>
+            Edit
+        </button>
+    );
+}
+```
+
+---
+
+# 20. DELETE BUTTON (CSR)
+
+## components/DeleteButton.jsx
+
+```jsx id="6h3g5w"
+"use client";
+
+export default function DeleteButton({ id }) {
+
+    async function deleteUser() {
+
+        await fetch(`/api/users/${id}`, {
+            method: "DELETE",
+        });
+
+        alert("User Deleted");
+    }
+
+    return (
+        <button onClick={deleteUser}>
+            Delete
+        </button>
+    );
+}
+```
+
+---
+
+# 21. SSR + CSR TOGETHER
+
+```txt id="klu8v8"
+SSR Component
+      │
+      ├── Fetch DB Data
+      │
+      └── Use CSR Components
+              │
+              ├── Add Button
+              ├── Edit Button
+              └── Delete Button
+```
+
+---
+
+# 22. USER TABLE
+
+## components/UserTable.jsx
+
+```jsx id="a2h5l5"
+import AddButton from "./AddButton";
+import EditButton from "./EditButton";
+import DeleteButton from "./DeleteButton";
+
+export default function UserTable({ users }) {
+
+    return (
+        <div>
+
+            <AddButton />
+
+            <hr />
+
+            {users.map((user) => (
+
+                <div key={user.id}>
+
+                    <h3>{user.name}</h3>
+
+                    <p>{user.email}</p>
+
+                    <EditButton id={user.id} />
+
+                    <DeleteButton id={user.id} />
+
+                </div>
+            ))}
+        </div>
+    );
+}
+```
+
+---
+
+# 23. COMPLETE CRUD API
+
+---
+
+# 24. CREATE + READ API
+
+## app/api/users/route.js
+
+```js id="k1vdfw"
+import { prisma } from "@/lib/prisma";
+
+
+// GET ALL USERS
+export async function GET() {
+
+    const users = await prisma.user.findMany();
+
+    return Response.json(users);
+}
+
+
+// CREATE USER
+export async function POST(req) {
+
+    const body = await req.json();
+
+    const user = await prisma.user.create({
+        data: {
+            name: body.name,
+            email: body.email,
+        },
+    });
+
+    return Response.json({
+        message: "User Created",
+        data: user,
+    });
+}
+```
+
+---
+
+# 25. UPDATE + DELETE API
+
+## app/api/users/[id]/route.js
+
+```js id="a1um2y"
+import { prisma } from "@/lib/prisma";
+
+
+// UPDATE USER
+export async function PUT(req, { params }) {
+
+    const body = await req.json();
+
+    const user = await prisma.user.update({
+
+        where: {
+            id: Number(params.id),
+        },
+
+        data: {
+            name: body.name,
+        },
+    });
+
+    return Response.json({
+        message: "User Updated",
+        data: user,
+    });
+}
+
+
+// DELETE USER
+export async function DELETE(req, { params }) {
+
+    await prisma.user.delete({
+
+        where: {
+            id: Number(params.id),
+        },
+    });
+
+    return Response.json({
+        message: "User Deleted",
+    });
+}
+```
+
+---
+
+# 26. CRUD FLOW
+
+```txt id="zdd70d"
+USER CLICK BUTTON
+        │
+        ▼
+CSR COMPONENT
+(Button/Form)
+        │
+        ▼
+fetch("/api/users")
+        │
+        ▼
+API ROUTE
+(GET/POST/PUT/DELETE)
+        │
+        ▼
+PRISMA ORM
+        │
+        ▼
+DATABASE
+(MySQL/Postgres)
+        │
+        ▼
+RETURN RESPONSE
+        │
+        ▼
+UPDATE UI
+```
+
+---
+
+# 27. MIDDLEWARE CONCEPT
+
+```txt id="rnybdh"
+Browser Request
+       │
+       ▼
+middleware.js
+       │
+       ├── Check Token
+       ├── Check Login
+       ├── Check Role
+       └── Allow / Redirect
+```
+
+---
+
+# 28. PUBLIC ROUTES
+
+```txt id="kruw7k"
+/login
+/register
+/about
+/contact
+```
+
+---
+
+# 29. PRIVATE ROUTES
+
+```txt id="y3d9e8"
+/dashboard
+/profile
+/admin
+/settings
+```
+
+---
+
+# 30. COMPLETE NEXT.JS MIDDLEWARE
+
+## middleware.js
+
+```js id="8vux4v"
+import { NextResponse } from "next/server";
+
+export function middleware(req) {
+
+    // CURRENT PATH
+    const path = req.nextUrl.pathname;
+
+    // TOKEN
+    const token = req.cookies.get("token")?.value;
+
+    // PUBLIC ROUTES
+    const publicRoutes = [
+        "/login",
+        "/register",
+    ];
+
+    // CHECK PUBLIC
+    const isPublicRoute =
+        publicRoutes.includes(path);
+
+    // NOT LOGIN
+    if (!token && !isPublicRoute) {
+
+        return NextResponse.redirect(
+            new URL("/login", req.url)
+        );
+    }
+
+    // ALREADY LOGIN
+    if (token && isPublicRoute) {
+
+        return NextResponse.redirect(
+            new URL("/dashboard", req.url)
+        );
+    }
+
+    // CONTINUE REQUEST
+    return NextResponse.next();
+}
+```
+
+---
+
+# 31. MIDDLEWARE CONFIG
+
+## middleware.js
+
+```js id="jlwm7x"
+export const config = {
+
+    matcher: [
+
+        "/dashboard/:path*",
+        "/profile/:path*",
+        "/admin/:path*",
+
+        "/login",
+        "/register",
+    ],
+};
+```
+
+---
+
+# 32. EXPRESS VS NEXT.JS MIDDLEWARE
+
+## EXPRESS
+
+```js id="9m2t1k"
+(req, res, next)
+```
+
+---
+
+## NEXT.JS
+
+```js id="3w62o7"
+(req)
+```
+
+---
+
+# 33. Why Next.js Has No next() ?
+
+Because Next.js uses:
+
+```js id="7fkrg8"
+NextResponse.next()
+```
+
+instead of:
+
+```js id="mdu4mw"
+next()
+```
+
+---
+
+# 34. NEXT.JS MIDDLEWARE METHODS
+
+| Method                  | Work             |
+| ----------------------- | ---------------- |
+| NextResponse.next()     | Continue Request |
+| NextResponse.redirect() | Redirect         |
+| NextResponse.rewrite()  | Rewrite URL      |
+| NextResponse.json()     | Return JSON      |
+
+---
+
+# 35. LOGIN API
+
+## app/api/login/route.js
+
+```js id="l6h0q5"
+import { NextResponse } from "next/server";
+
+export async function POST(req) {
+
+    const body = await req.json();
+
+    if (
+        body.email === "admin@gmail.com" &&
+        body.password === "123456"
+    ) {
+
+        const response =
+            NextResponse.json({
+                message: "Login Success",
+            });
+
+        response.cookies.set(
+            "token",
+            "abc123"
+        );
+
+        return response;
+    }
+
+    return NextResponse.json({
+        message: "Invalid Credential",
+    });
+}
+```
+
+---
+
+# 36. LOGOUT API
+
+## app/api/logout/route.js
+
+```js id="n4m2jr"
+import { NextResponse } from "next/server";
+
+export async function POST() {
+
+    const response =
+        NextResponse.json({
+            message: "Logout Success",
+        });
+
+    response.cookies.delete("token");
+
+    return response;
+}
+```
+
+---
+
+# 37. Prisma CRUD Methods
+
+| Method                   | Work    |
+| ------------------------ | ------- |
+| prisma.user.findMany()   | Get All |
+| prisma.user.findUnique() | Get One |
+| prisma.user.create()     | Insert  |
+| prisma.user.update()     | Update  |
+| prisma.user.delete()     | Delete  |
+
+---
+
+# 38. MOST IMPORTANT RULES
+
+## RULE 1
+
+```txt id="4nr2mu"
+Server Component = DEFAULT
+```
+
+---
+
+## RULE 2
+
+```txt id="bzdb4z"
+"use client"
+```
+
+Needed for:
+
+* useState
+* useEffect
+* onClick
+
+---
+
+## RULE 3
+
+```txt id="jlwmv7"
+API Route = Backend
+```
+
+---
+
+## RULE 4
+
+```txt id="4d7rf5"
+Prisma = ORM Layer
+```
+
+---
+
+## RULE 5
+
+```txt id="e4yqtk"
+middleware.js
+```
+
+Runs BEFORE page loads.
+
+---
+
+# 39. FULL REAL WORLD FLOW
+
+```txt id="8fxmvv"
+USER OPEN PAGE
+        │
+        ▼
+MIDDLEWARE CHECK
+        │
+        ├── INVALID TOKEN
+        │        ▼
+        │    REDIRECT LOGIN
+        │
+        └── VALID TOKEN
+                 │
+                 ▼
+          SSR FETCH DATA
+                 │
+                 ▼
+           PRISMA ORM
+                 │
+                 ▼
+             DATABASE
+                 │
+                 ▼
+          RETURN DATA
+                 │
+                 ▼
+         RENDER HTML PAGE
+                 │
+                 ▼
+         CSR BUTTON CLICK
+                 │
+                 ▼
+          API CRUD REQUEST
+                 │
+                 ▼
+             PRISMA ORM
+                 │
+                 ▼
+              DATABASE
+                 │
+                 ▼
+            UPDATE UI
+```
+
+---
+
+# 40. Interview Questions
+
+## Q1: What is SSR ?
+
+Server renders HTML before sending to browser.
+
+---
+
+## Q2: What is CSR ?
+
+Browser renders page after JavaScript loads.
+
+---
+
+## Q3: Why Prisma ORM ?
+
+Easy database management using JavaScript objects.
+
+---
+
+## Q4: Why use Middleware ?
+
+Protect private routes.
+
+---
+
+## Q5: Can SSR use CSR Component ?
+
+YES.
+
+---
+
+## Q6: Can CSR use SSR Component ?
+
+NO.
+
+---
+
+# 41. Final Quick Summary
+
+| Topic         | Meaning                   |
+| ------------- | ------------------------- |
+| SSR           | Server Side Rendering     |
+| CSR           | Client Side Rendering     |
+| Prisma        | ORM                       |
+| API Route     | Backend                   |
+| Middleware    | Route Protection          |
+| Public Route  | No Login                  |
+| Private Route | Login Required            |
+| CRUD          | Create Read Update Delete |
