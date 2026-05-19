@@ -1,0 +1,382 @@
+# Next.js Error Handling & Logging Cheat Sheet (Production Level)
+
+This note covers:
+
+* Try / Catch / Finally pattern
+* Error handling architecture
+* Logging strategy
+* File-based error logs
+* API route error handling
+* Server action error handling
+* Production debugging flow
+
+---
+
+# 1. Try - Catch - Finally (Core Concept)
+
+## Basic Structure
+
+```js
+try {
+  // risky code
+  const data = await fetch("/api/users");
+  const result = await data.json();
+} catch (error) {
+  console.error("Error occurred:", error);
+} finally {
+  console.log("Always runs");
+}
+```
+
+---
+
+## Explanation
+
+| Block   | Purpose                   |
+| ------- | ------------------------- |
+| try     | runs main logic           |
+| catch   | handles error safely      |
+| finally | always executes (cleanup) |
+
+---
+
+## Real Use Case
+
+```js
+async function getUsers() {
+  try {
+    const res = await fetch("/api/users");
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch users");
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error("User fetch error:", error);
+    return [];
+  } finally {
+    console.log("Fetch attempt completed");
+  }
+}
+```
+
+---
+
+# 2. Error Handling in Next.js API Routes
+
+## Route Handler Example
+
+```js
+export async function GET() {
+  try {
+    const users = await prisma.user.findMany();
+
+    return Response.json({ success: true, users });
+  } catch (error) {
+    console.error("API Error:", error);
+
+    return Response.json(
+      { success: false, message: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+# 3. Server Action Error Handling
+
+```js
+"use server";
+
+export async function createUser(formData) {
+  try {
+    const name = formData.get("name");
+
+    if (!name) {
+      throw new Error("Name is required");
+    }
+
+    await prisma.user.create({
+      data: { name },
+    });
+  } catch (error) {
+    console.error("Server Action Error:", error);
+    throw new Error("Failed to create user");
+  }
+}
+```
+
+---
+
+# 4. Global Error Handling in Next.js
+
+## error.js (App Router)
+
+```js
+"use client";
+
+export default function Error({ error, reset }) {
+  console.error(error);
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button onClick={() => reset()}>Retry</button>
+    </div>
+  );
+}
+```
+
+---
+
+# 5. not-found.js Handling
+
+```js
+export default function NotFound() {
+  return <h1>404 - Page Not Found</h1>;
+}
+```
+
+---
+
+# 6. Logging System (Production Level)
+
+## Why Logging is Important
+
+* Debug production issues
+* Track API failures
+* Monitor system health
+* Security auditing
+
+---
+
+# 7. Console Logging (Basic)
+
+```js
+console.log("Info log");
+console.error("Error log");
+console.warn("Warning log");
+```
+
+---
+
+# 8. Structured Logging (Recommended)
+
+```js
+console.log(JSON.stringify({
+  level: "error",
+  message: "User creation failed",
+  time: new Date().toISOString(),
+  module: "user-service"
+}));
+```
+
+---
+
+# 9. File-Based Error Logging (IMPORTANT)
+
+## Why File Logging?
+
+* Persistent logs
+* Production debugging
+* Server crash tracking
+
+---
+
+## Step 1: Create logger utility
+
+```js
+import fs from "fs";
+import path from "path";
+
+const logFile = path.join(process.cwd(), "logs", "error.log");
+
+export function logErrorToFile(error) {
+  const log = `
+[${new Date().toISOString()}]
+ERROR: ${error.message}
+STACK: ${error.stack}
+------------------------
+`;
+
+  fs.appendFileSync(logFile, log);
+}
+```
+
+---
+
+## Step 2: Use in API
+
+```js
+import { logErrorToFile } from "@/lib/logger";
+
+export async function GET() {
+  try {
+    throw new Error("Test error");
+  } catch (error) {
+    logErrorToFile(error);
+
+    return Response.json({ error: "Something failed" }, { status: 500 });
+  }
+}
+```
+
+---
+
+# 10. Separate Log Files (Best Practice)
+
+## Folder Structure
+
+```txt
+logs/
+ ├── error.log
+ ├── auth.log
+ ├── api.log
+ ├── db.log
+```
+
+---
+
+## Advanced Logger
+
+```js
+import fs from "fs";
+import path from "path";
+
+function writeLog(file, data) {
+  const filePath = path.join(process.cwd(), "logs", file);
+
+  fs.appendFileSync(filePath, data + "\n");
+}
+
+export function logError(error) {
+  writeLog("error.log", `[ERROR] ${error.message}`);
+}
+
+export function logAuth(message) {
+  writeLog("auth.log", `[AUTH] ${message}`);
+}
+
+export function logDB(message) {
+  writeLog("db.log", `[DB] ${message}`);
+}
+```
+
+---
+
+# 11. API Logging Example
+
+```js
+import { logError, logDB } from "@/lib/logger";
+
+export async function GET() {
+  try {
+    logDB("Fetching users from database");
+
+    const users = await prisma.user.findMany();
+
+    return Response.json(users);
+  } catch (error) {
+    logError(error);
+
+    return Response.json({ error: "Failed" }, { status: 500 });
+  }
+}
+```
+
+---
+
+# 12. Production Logging Levels
+
+| Level | Meaning          |
+| ----- | ---------------- |
+| INFO  | normal flow      |
+| WARN  | potential issue  |
+| ERROR | failure          |
+| DEBUG | development only |
+
+---
+
+# 13. Best Practice Architecture
+
+## Logging Flow
+
+```txt
+Request → Try Block → Service → DB → Catch Error → Logger → File/Monitoring System
+```
+
+---
+
+# 14. Advanced Production Setup (Recommended)
+
+Instead of only files, use:
+
+* Winston (Node logger)
+* Pino (high performance logger)
+* Datadog / Sentry (monitoring)
+
+---
+
+# 15. Sentry Style Error Tracking (Concept)
+
+```js
+try {
+  riskyOperation();
+} catch (error) {
+  // send to monitoring tool
+  console.error(error);
+}
+```
+
+---
+
+# 16. Golden Rules
+
+* Always wrap API logic in try-catch
+* Never expose raw errors to client
+* Log full error server-side only
+* Separate logs by domain (auth/db/api)
+* Use structured logs in production
+* Keep error messages user-friendly
+
+---
+
+# 17. Summary
+
+A production-ready Next.js system should have:
+
+* Centralized error handling
+* API try-catch everywhere
+* Server action error protection
+* File-based logging OR monitoring tool
+* Structured logging format
+* Separate log categories
+
+---
+
+# 18. Final Architecture
+
+```txt
+Client Request
+   ↓
+API Route / Server Action
+   ↓
+Try Block
+   ↓
+Service Layer
+   ↓
+Database (Prisma)
+   ↓
+Catch Error
+   ↓
+Logger (File / Tool)
+   ↓
+Response
+```
+
+---
+
+End of Cheat Sheet
